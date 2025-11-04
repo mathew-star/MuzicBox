@@ -1,22 +1,24 @@
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";
-import morgan from "morgan";
-import { ENV } from "./config/env.js";
-
+import { requestId } from "./middlewares/requestId.js";
+import { notFound } from "./middlewares/notFound.js";
+import { errorHandler } from "./middlewares/errorHandler.js";
+import { logger } from "./utils/logger.js";
 
 const app = express();
 
-// Middlewares
+// Global Middlewares
 app.use(cors());
-app.use(helmet());
 app.use(express.json());
-app.use(morgan("dev"));
+app.use(requestId);
 
+// Health Check
+app.get("/api/health", (_req, res) => {
+  res.json({ success: true, message: "API is healthy 💚" });
+});
 
-
-app.get("/", (_, res) => res.json({ status: "OK", env: ENV.NODE_ENV }));
-
-
+// 404 + Error
+app.use(notFound);
+app.use(errorHandler);
 
 export default app;

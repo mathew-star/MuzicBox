@@ -13,3 +13,114 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+
+// Host user (persists across sessions)
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  rooms     Room[]   @relation("HostRooms")
+  
+  @@index([email])
+}
+
+
+// Guest (session-based, temporary)
+model Guest {
+  id        String   @id @default(cuid())
+  name      String
+  sessionId String   @unique // Browser session ID
+  roomId    String
+  createdAt DateTime @default(now())
+  
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  votes     Vote[]
+  
+  @@index([roomId])
+  @@index([sessionId])
+}
+
+
+
+// Party room
+model Room {
+  id              String    @id @default(cuid())
+  code            String    @unique // 6-digit join code
+  name            String
+  hostId          String
+  spotifyPlaylist String?   // Spotify playlist ID if using playlists
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  host            User      @relation("HostRooms", fields: [hostId], references: [id])
+  guests          Guest[]
+  queue           QueueItem[]
+  
+  @@index([code])
+  @@index([hostId])
+}
+
+
+
+// Song in the queue
+model QueueItem {
+  id              String   @id @default(cuid())
+  roomId          String
+  spotifyTrackId  String
+  trackName       String
+  artistName      String
+  albumArt        String
+  duration        Int      // milliseconds
+  addedById       String   // Guest or User ID
+  addedByType     String   // "host" or "guest"
+  position        Int      // Queue position
+  voteScore       Int      @default(0)
+  isPlaying       Boolean  @default(false)
+  hasPlayed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  
+  room            Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  votes           Vote[]
+  
+  @@index([roomId])
+  @@index([spotifyTrackId])
+  @@unique([roomId, position])
+}
+
+
+
+// Voting on songs
+model Vote {
+  id           String    @id @default(cuid())
+  queueItemId  String
+  guestId      String
+  voteType     String    // "up" or "down"
+  createdAt    DateTime  @default(now())
+  
+  queueItem    QueueItem @relation(fields: [queueItemId], references: [id], onDelete: Cascade)
+  guest        Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  
+  @@unique([queueItemId, guestId]) // One vote per guest per song
+  @@index([queueItemId])
+}
+
+
+
+
+// Spotify OAuth tokens (for host)
+model SpotifyToken {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([userId])
+}
